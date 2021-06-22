@@ -9,24 +9,57 @@ import Setmap from "./Setmap";
 function App() {
   const [pinCode, setPinCode] = useState("243001");
   const [date, setDate] = useState(moment(new Date()).format("DD-MM-YYYY"));
+  // const [date, setDate] = useState("14-06-2021");
   const [type, setType] = useState("COVAXIN");
   const [centers, setCenters] = useState([]);
 
   useEffect(() => {
+    if (Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
     getData();
-    const interval = setInterval(() => {
-      getData();
-    }, 20000);
+    const interval = setInterval(getData, 20000);
 
     return () => {
       clearInterval(interval);
     };
-  });
+  }, []);
 
   const handleTypeChange = (event) => {
     if (event.target.checked) {
       setType(event.target.value);
     }
+  };
+
+  const pushNotification = (msg) => {
+    if (Notification.permission !== "granted") {
+      Notification.requestPermission();
+    } else {
+      const notification = new Notification("Slot available", {
+        body: msg,
+      });
+      notification.onclick = function () {
+        window.open("http://localhost:3000/");
+      };
+    }
+  };
+
+  const filterData = (centers) => {
+    return centers.filter(
+      (center) =>
+        center.sessions.filter((session) => {
+          if (
+            session.min_age_limit === 18 &&
+            session.available_capacity_dose2 > 0 &&
+            session.vaccine === "COVAXIN" &&
+            center.fee_type !== "Paid"
+          ) {
+            const msg = `${session.vaccine} available at ${center.name}: ${session.available_capacity} slots`;
+            pushNotification(msg);
+          }
+          return session.min_age_limit === 18;
+        }).length > 0
+    );
   };
 
   const getData = async () => {
@@ -36,7 +69,7 @@ function App() {
     response
       .json()
       .then((data) => {
-        setCenters(data.centers);
+        setCenters(filterData(data.centers));
       })
       .catch((err) => {
         console.log(err);
